@@ -1,0 +1,138 @@
+@import "tailwindcss";
+
+:root {
+  --primary: #f97316;
+  --primary-hover: #ea580c;
+  --bg-dark: #0f172a;
+  --bg-dark-light: #1e293b;
+  --bg-card: #ffffff;
+  --text-primary: #1e293b;
+  --text-secondary: #64748b;
+  --text-light: #94a3b8;
+  --border-color: #e2e8f0;
+}
+
+body {
+  background: #ffffff;
+  color: var(--text-primary);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* Dark section background */
+.bg-dark-gradient {
+  background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+}
+
+/* Primary button - Orange */
+.btn-primary {
+  @apply bg-orange-500 hover:bg-orange-600 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 inline-flex items-center gap-2;
+}
+
+/* Secondary/Outline button */
+.btn-secondary {
+  @apply bg-white hover:bg-gray-50 text-gray-700 font-medium py-3 px-6 rounded-lg border border-gray-300 transition-all duration-200;
+}
+
+/* Card styles */
+.card {
+  @apply bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200;
+}
+
+/* Badge/Tag styles */
+.badge {
+  @apply inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium;
+}
+
+.badge-orange {
+  @apply bg-orange-500/10 text-orange-500 border border-orange-500/20;
+}
+
+.badge-blue {
+  @apply bg-blue-500/10 text-blue-500 border border-blue-500/20;
+}
+
+/* Form input styles */
+.input-field {
+  @apply w-full px-4 py-3 rounded-lg border border-gray-200 bg-gray-50 focus:bg-white focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 outline-none transition-all duration-200;
+}
+
+.select-field {
+  @apply w-full px-4 py-3 rounded-lg border border-gray-200 bg-gray-50 focus:bg-white focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 outline-none transition-all duration-200 appearance-none cursor-pointer;
+}
+
+/* Smooth scroll behavior */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Email preview card styling */
+.email-preview-card {
+  @apply bg-slate-800 rounded-lg border border-slate-700 shadow-xl;
+}
+
+/* Stats number styling */
+.stat-number {
+  @apply text-4xl font-bold text-orange-500;
+}
+
+/* Step number circle */
+.step-circle {
+  @apply w-16 h-16 rounded-full bg-orange-500 flex items-center justify-center text-white font-bold text-xl;
+}
+
+/* Feature card icon */
+.feature-icon {
+  @apply w-12 h-12 rounded-xl flex items-center justify-center text-xl;
+}
+
+/* Testimonial card */
+.testimonial-card {
+  @apply bg-white rounded-xl border border-gray-200 p-6 shadow-sm;
+}
+
+/* Avatar colors */
+.avatar-purple { @apply bg-purple-500; }
+.avatar-blue { @apply bg-blue-500; }
+.avatar-green { @apply bg-green-500; }
+.avatar-orange { @apply bg-orange-500; }
+
+/* Tone selector */
+.tone-option {
+  @apply flex-1 p-4 rounded-lg border-2 border-gray-200 cursor-pointer transition-all duration-200 hover:border-orange-300;
+}
+
+.tone-option.selected {
+  @apply border-orange-500 bg-orange-50;
+}
+
+/* Animation for floating badge */
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+
+.floating {
+  animation: float 3s ease-in-out infinite;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
