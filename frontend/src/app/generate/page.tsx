@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 
@@ -47,7 +48,9 @@ const tones = [
   { value: 'formal', label: 'Formal', description: 'Respectful & structured' },
 ];
 
-export default function GeneratePage() {
+function GeneratePageContent() {
+  const searchParams = useSearchParams();
+  
   const [formData, setFormData] = useState({
     yourName: '',
     yourRole: '',
@@ -58,6 +61,7 @@ export default function GeneratePage() {
     purpose: '',
     tone: 'professional',
     additionalContext: '',
+    recipientEmail: '', // New field for sending email
   });
 
   const [generatedEmail, setGeneratedEmail] = useState<{
@@ -68,6 +72,142 @@ export default function GeneratePage() {
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
   const [copiedSubject, setCopiedSubject] = useState(false);
+  
+  // Gmail integration state
+  const [gmailConnected, setGmailConnected] = useState(false);
+  const [gmailUser, setGmailUser] = useState<{ email: string; name: string; picture?: string } | null>(null);
+  const [gmailToken, setGmailToken] = useState<string | null>(null);
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [sendSuccess, setSendSuccess] = useState(false);
+
+  // Check for Gmail connection on mount
+  useEffect(() => {
+    // Check URL params for OAuth callback
+    const connected = searchParams.get('gmail_connected');
+    const token = searchParams.get('token');
+    const errorParam = searchParams.get('error');
+
+    if (errorParam) {
+      setError(`Gmail connection failed: ${errorParam}`);
+      // Clean URL
+      window.history.replaceState({}, '', '/generate');
+    }
+
+    if (connected === 'true' && token) {
+      localStorage.setItem('gmail_token', token);
+      setGmailToken(token);
+      // Clean URL
+      window.history.replaceState({}, '', '/generate');
+    }
+
+    // Check for existing token
+    const savedToken = localStorage.getItem('gmail_token');
+    if (savedToken) {
+      setGmailToken(savedToken);
+      checkGmailSession(savedToken);
+    }
+  }, [searchParams]);
+
+  // Check Gmail session
+  const checkGmailSession = async (token: string) => {
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/session`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      const data = await response.json();
+      
+      if (data.connected && data.user) {
+        setGmailConnected(true);
+        setGmailUser(data.user);
+      } else {
+        // Token invalid, clear it
+        localStorage.removeItem('gmail_token');
+        setGmailToken(null);
+        setGmailConnected(false);
+        setGmailUser(null);
+      }
+    } catch (err) {
+      console.error('Session check error:', err);
+    }
+  };
+
+  // Connect Gmail
+  const handleConnectGmail = async () => {
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/google/url`);
+      const data = await response.json();
+      
+      if (data.authUrl) {
+        window.location.href = data.authUrl;
+      }
+    } catch {
+      setError('Failed to connect Gmail. Please try again.');
+    }
+  };
+
+  // Disconnect Gmail
+  const handleDisconnectGmail = async () => {
+    try {
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/disconnect`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${gmailToken}`,
+        },
+      });
+      
+      localStorage.removeItem('gmail_token');
+      setGmailToken(null);
+      setGmailConnected(false);
+      setGmailUser(null);
+    } catch (err) {
+      console.error('Disconnect error:', err);
+    }
+  };
+
+  // Send email via Gmail
+  const handleSendEmail = async () => {
+    if (!generatedEmail || !gmailToken || !formData.recipientEmail) {
+      setError('Please enter recipient email address');
+      return;
+    }
+
+    setIsSendingEmail(true);
+    setError('');
+    setSendSuccess(false);
+
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/send`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${gmailToken}`,
+        },
+        body: JSON.stringify({
+          to: formData.recipientEmail,
+          subject: generatedEmail.subject,
+          body: generatedEmail.body,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setSendSuccess(true);
+        setTimeout(() => setSendSuccess(false), 5000);
+      } else {
+        setError(data.error || 'Failed to send email');
+        if (data.error?.includes('reconnect') || data.error?.includes('expired')) {
+          handleDisconnectGmail();
+        }
+      }
+    } catch {
+      setError('Failed to send email. Please try again.');
+    } finally {
+      setIsSendingEmail(false);
+    }
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -480,6 +620,99 @@ export default function GeneratePage() {
                           </>
                         )}
                       </button>
+
+                      {/* Divider */}
+                      <div className="relative py-2">
+                        <div className="absolute inset-0 flex items-center">
+                          <div className="w-full border-t border-gray-200"></div>
+                        </div>
+                        <div className="relative flex justify-center text-xs uppercase">
+                          <span className="bg-white px-2 text-gray-400">or send directly</span>
+                        </div>
+                      </div>
+
+                      {/* Gmail Integration Section */}
+                      {gmailConnected && gmailUser ? (
+                        <div className="space-y-3">
+                          {/* Connected Account */}
+                          <div className="flex items-center justify-between bg-green-50 rounded-lg px-4 py-3">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center">
+                                <svg className="w-5 h-5" viewBox="0 0 24 24">
+                                  <path fill="#EA4335" d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 0 1 0 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.64 12 9.548l6.545-4.91 1.528-1.145C21.69 2.28 24 3.434 24 5.457z"/>
+                                </svg>
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium text-gray-900">{gmailUser.name || gmailUser.email}</p>
+                                <p className="text-xs text-gray-500">{gmailUser.email}</p>
+                              </div>
+                            </div>
+                            <button
+                              onClick={handleDisconnectGmail}
+                              className="text-xs text-gray-400 hover:text-red-500 transition-colors"
+                            >
+                              Disconnect
+                            </button>
+                          </div>
+
+                          {/* Recipient Email Input */}
+                          <div>
+                            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
+                              Recipient Email
+                            </label>
+                            <input
+                              type="email"
+                              value={formData.recipientEmail}
+                              onChange={(e) => setFormData(prev => ({ ...prev, recipientEmail: e.target.value }))}
+                              placeholder="Enter recipient's email address"
+                              className="w-full px-4 py-3 rounded-lg border border-gray-200 bg-gray-50 focus:bg-white focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 outline-none transition-all text-sm"
+                            />
+                          </div>
+
+                          {/* Success Message */}
+                          {sendSuccess && (
+                            <div className="bg-green-50 border border-green-200 text-green-600 px-4 py-3 rounded-lg text-sm flex items-center gap-2">
+                              <span>✅</span>
+                              Email sent successfully!
+                            </div>
+                          )}
+
+                          {/* Send Button */}
+                          <button
+                            onClick={handleSendEmail}
+                            disabled={isSendingEmail || !formData.recipientEmail}
+                            className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+                          >
+                            {isSendingEmail ? (
+                              <>
+                                <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                </svg>
+                                Sending...
+                              </>
+                            ) : (
+                              <>
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                                </svg>
+                                Send via Gmail
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      ) : (
+                        /* Connect Gmail Button */
+                        <button
+                          onClick={handleConnectGmail}
+                          className="w-full py-3 bg-white border-2 border-gray-200 hover:border-gray-300 text-gray-700 font-medium rounded-lg transition-colors flex items-center justify-center gap-3"
+                        >
+                          <svg className="w-5 h-5" viewBox="0 0 24 24">
+                            <path fill="#EA4335" d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 0 1 0 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.64 12 9.548l6.545-4.91 1.528-1.145C21.69 2.28 24 3.434 24 5.457z"/>
+                          </svg>
+                          Connect Gmail to Send
+                        </button>
+                      )}
                     </div>
                   </div>
                 ) : (
@@ -530,5 +763,20 @@ export default function GeneratePage() {
 
       <Footer />
     </main>
+  );
+}
+
+export default function GeneratePage() {
+  return (
+    <Suspense fallback={
+      <main className="min-h-screen bg-gray-50">
+        <Header />
+        <div className="flex items-center justify-center h-96">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
+        </div>
+      </main>
+    }>
+      <GeneratePageContent />
+    </Suspense>
   );
 }

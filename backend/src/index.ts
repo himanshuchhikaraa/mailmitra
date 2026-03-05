@@ -1,9 +1,11 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import cookieParser from 'cookie-parser';
 import { config } from './config';
 import { connectDB } from './config/database';
 import emailRoutes from './routes/emailRoutes';
+import authRoutes from './routes/authRoutes';
 
 const app = express();
 
@@ -42,12 +44,14 @@ app.use(cors({
 // Body parser with size limits to prevent DoS
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
+app.use(cookieParser());
 
 // Trust proxy for rate limiting behind reverse proxy (Vercel, etc)
 app.set('trust proxy', 1);
 
 // Routes
 app.use('/api/email', emailRoutes);
+app.use('/api/auth', authRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
