@@ -17,6 +17,7 @@ app.use(helmet());
 const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:3001',
+  'https://mailmitra.vercel.app',
   config.frontendUrl,
 ].filter(Boolean);
 
@@ -33,9 +34,15 @@ app.use(cors({
     // Allow requests with no origin (mobile apps, curl, etc)
     if (!origin) return callback(null, true);
     
+    // Allow all origins if FRONTEND_URL is set to '*'
+    if (config.frontendUrl === '*') {
+      return callback(null, true);
+    }
+    
     if (allowedOrigins.includes(origin) || config.nodeEnv === 'development') {
       callback(null, true);
     } else {
+      console.log('CORS blocked origin:', origin);
       callback(new Error('Not allowed by CORS'));
     }
   },
