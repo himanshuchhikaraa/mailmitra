@@ -8,18 +8,13 @@ import {
   sendEmail,
   refreshAccessToken,
 } from '../services/gmailService';
-
-// Store for user sessions (in production, use Redis or database)
-interface UserSession {
-  email: string;
-  name: string;
-  picture?: string;
-  accessToken: string;
-  refreshToken: string;
-  expiresAt: number;
-}
-
-const userSessions = new Map<string, UserSession>();
+import {
+  saveSession,
+  getSession,
+  updateSession,
+  deleteSession,
+  UserSession,
+} from '../services/sessionService';
 
 // Generate JWT token
 const generateToken = (email: string): string => {
@@ -72,7 +67,7 @@ export const handleGmailCallback = async (req: Request, res: Response): Promise<
       return;
     }
 
-    // Store session
+    // Store session in Redis
     const session: UserSession = {
       email: userInfo.email,
       name: userInfo.name || '',
@@ -82,7 +77,7 @@ export const handleGmailCallback = async (req: Request, res: Response): Promise<
       expiresAt: Date.now() + (tokens.expiry_date || 3600000),
     };
 
-    userSessions.set(userInfo.email, session);
+    await saveSession(userInfo.email, session);
 
     // Generate JWT
     const jwtToken = generateToken(userInfo.email);
@@ -96,7 +91,7 @@ export const handleGmailCallback = async (req: Request, res: Response): Promise<
 };
 
 // Get current user session
-export const getSession = async (req: Request, res: Response): Promise<void> => {
+export const getSessionHandler = async (req: Request, res: Response): Promise<void> => {
   try {
     const authHeader = req.headers.authorization;
     const token = authHeader?.replace('Bearer ', '');
@@ -112,7 +107,7 @@ export const getSession = async (req: Request, res: Response): Promise<void> => 
       return;
     }
 
-    const session = userSessions.get(decoded.email);
+    const session = await getSession(decoded.email);
     if (!session) {
       res.json({ success: true, connected: false });
       return;
@@ -122,11 +117,12 @@ export const getSession = async (req: Request, res: Response): Promise<void> => 
     if (Date.now() > session.expiresAt - 60000) {
       try {
         const newCredentials = await refreshAccessToken(session.refreshToken);
-        session.accessToken = newCredentials.access_token!;
-        session.expiresAt = Date.now() + (newCredentials.expiry_date || 3600000);
-        userSessions.set(decoded.email, session);
+        await updateSession(decoded.email, {
+          accessToken: newCredentials.access_token!,
+          expiresAt: Date.now() + (newCredentials.expiry_date || 3600000),
+        });
       } catch {
-        userSessions.delete(decoded.email);
+        await deleteSession(decoded.email);
         res.json({ success: true, connected: false });
         return;
       }
@@ -156,7 +152,7 @@ export const disconnectGmail = async (req: Request, res: Response): Promise<void
     if (token) {
       const decoded = verifyToken(token);
       if (decoded) {
-        userSessions.delete(decoded.email);
+        await deleteSession(decoded.email);
       }
     }
 
@@ -184,7 +180,7 @@ export const sendGmailEmail = async (req: Request, res: Response): Promise<void>
       return;
     }
 
-    const session = userSessions.get(decoded.email);
+    const session = await getSession(decoded.email);
     if (!session) {
       res.status(401).json({ success: false, error: 'Session expired. Please reconnect Gmail.' });
       return;
@@ -209,11 +205,14 @@ export const sendGmailEmail = async (req: Request, res: Response): Promise<void>
     if (Date.now() > session.expiresAt - 60000) {
       try {
         const newCredentials = await refreshAccessToken(session.refreshToken);
+        await updateSession(decoded.email, {
+          accessToken: newCredentials.access_token!,
+          expiresAt: Date.now() + (newCredentials.expiry_date || 3600000),
+        });
+        // Update local session object
         session.accessToken = newCredentials.access_token!;
-        session.expiresAt = Date.now() + (newCredentials.expiry_date || 3600000);
-        userSessions.set(decoded.email, session);
       } catch {
-        userSessions.delete(decoded.email);
+        await deleteSession(decoded.email);
         res.status(401).json({ success: false, error: 'Session expired. Please reconnect Gmail.' });
         return;
       }

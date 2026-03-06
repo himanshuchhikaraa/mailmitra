@@ -2,7 +2,7 @@ import { Router } from 'express';
 import {
   getGmailAuthUrl,
   handleGmailCallback,
-  getSession,
+  getSessionHandler,
   disconnectGmail,
   sendGmailEmail,
 } from '../controllers/authController';
@@ -16,7 +16,7 @@ router.get('/google/url', getGmailAuthUrl);
 router.get('/google/callback', handleGmailCallback);
 
 // Get current session
-router.get('/session', getSession);
+router.get('/session', getSessionHandler);
 
 // Disconnect Gmail
 router.post('/disconnect', disconnectGmail);

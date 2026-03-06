@@ -9,11 +9,14 @@ export const config = {
   nodeEnv: process.env.NODE_ENV || 'development',
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
   
-  // Google OAuth
+  // Google OAuth - MUST be set in .env file
   googleClientId: process.env.GOOGLE_CLIENT_ID || '',
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
   googleRedirectUri: process.env.GOOGLE_REDIRECT_URI || 'http://localhost:5000/api/auth/google/callback',
   
   // JWT for session
   jwtSecret: process.env.JWT_SECRET || 'mailmitra-secret-key-change-in-production',
+  
+  // Redis for session storage
+  redisUrl: process.env.REDIS_URL || '',
 };

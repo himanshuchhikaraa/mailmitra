@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { config } from './config';
 import { connectDB } from './config/database';
+import { initRedis } from './services/sessionService';
 import emailRoutes from './routes/emailRoutes';
 import authRoutes from './routes/authRoutes';
 
@@ -61,6 +62,7 @@ app.get('/api/health', (req, res) => {
 // Start server
 const startServer = async () => {
   await connectDB(); // Will gracefully handle connection failure
+  await initRedis(); // Initialize Redis for session storage
   
   app.listen(config.port, () => {
     console.log(`🚀 MailMitra API running on port ${config.port}`);
