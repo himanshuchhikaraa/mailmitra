@@ -1,11 +1,20 @@
 import { google } from 'googleapis';
 import { config } from '../config';
 
-const oauth2Client = new google.auth.OAuth2(
-  config.googleClientId,
-  config.googleClientSecret,
-  config.googleRedirectUri
-);
+// Check if Google credentials are configured
+const hasGoogleCredentials = Boolean(config.googleClientId && config.googleClientSecret);
+
+if (!hasGoogleCredentials) {
+  console.warn('⚠️ Google OAuth credentials not configured. Gmail integration will be disabled.');
+}
+
+const oauth2Client = hasGoogleCredentials 
+  ? new google.auth.OAuth2(
+      config.googleClientId,
+      config.googleClientSecret,
+      config.googleRedirectUri
+    )
+  : null;
 
 // Scopes required for sending emails
 const SCOPES = [
@@ -14,8 +23,14 @@ const SCOPES = [
   'https://www.googleapis.com/auth/userinfo.profile',
 ];
 
+// Check if Gmail is configured
+export const isGmailConfigured = (): boolean => hasGoogleCredentials;
+
 // Generate OAuth URL for user to authorize
 export const getAuthUrl = (): string => {
+  if (!oauth2Client) {
+    throw new Error('Gmail OAuth not configured');
+  }
   return oauth2Client.generateAuthUrl({
     access_type: 'offline',
     scope: SCOPES,
@@ -25,12 +40,18 @@ export const getAuthUrl = (): string => {
 
 // Exchange authorization code for tokens
 export const getTokensFromCode = async (code: string) => {
+  if (!oauth2Client) {
+    throw new Error('Gmail OAuth not configured');
+  }
   const { tokens } = await oauth2Client.getToken(code);
   return tokens;
 };
 
 // Get user info from tokens
 export const getUserInfo = async (accessToken: string) => {
+  if (!oauth2Client) {
+    throw new Error('Gmail OAuth not configured');
+  }
   oauth2Client.setCredentials({ access_token: accessToken });
   const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
   const { data } = await oauth2.userinfo.get();
@@ -43,6 +64,9 @@ export const getUserInfo = async (accessToken: string) => {
 
 // Refresh access token if expired
 export const refreshAccessToken = async (refreshToken: string) => {
+  if (!oauth2Client) {
+    throw new Error('Gmail OAuth not configured');
+  }
   oauth2Client.setCredentials({ refresh_token: refreshToken });
   const { credentials } = await oauth2Client.refreshAccessToken();
   return credentials;
@@ -83,6 +107,10 @@ export const sendEmail = async (
   body: string
 ): Promise<{ success: boolean; messageId?: string; error?: string }> => {
   try {
+    if (!oauth2Client) {
+      throw new Error('Gmail OAuth not configured');
+    }
+    
     oauth2Client.setCredentials({
       access_token: accessToken,
       refresh_token: refreshToken,
